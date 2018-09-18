@@ -1,0 +1,26 @@
+:global updver "6.40.9"
+
+:global updserver 2.2.2.2
+:global upduser "test"
+:global updpass "pass"
+:global updserver2 10.11.12.13
+:global upduser2 "admin"
+:global updpass2 "adminpass"
+/system package update set channel=bugfix ;
+:global curver [/system package update get installed-version]
+:global config
+:global packsizecheck
+[/file remove [ find type=package ]]
+:if ([ /system resource get architecture-name ]="smips") do={[:global packsizecheck 7200000]}
+:if ([ /system resource get architecture-name ]="mipsbe") do={[:global packsizecheck 10300000]}
+:if ([ /system resource get architecture-name ]="mmips") do={[:global packsizecheck 8400000]}
+:if ([ /system resource get architecture-name ]="powerpc") do={[:global packsizecheck 16700000]}
+:if ([ /system resource get architecture-name ]="tile") do={[:global packsizecheck 16100000]}
+:global updfwneed ([/system routerboard get current-firmware] < [/system routerboard get upgrade-firmware])
+:global updpackneed ($curver!=$updver)
+:if ($updfwneed or $updpackneed) do={[:if ([/system routerboard get current-firmware]!=[/system routerboard get upgrade-firmware]) do={[/system routerboard upgrade];[:put "fw or sw NOTok"]}];[:if ($updpackneed=true) do={[/tool fetch mode=ftp user=$upduser password=$updpass  keep-result=yes src-path=("soft/mikrotik/routeros-" . [ /system resource get architecture-name ] . "-" . [$updver] . ".npk" ) dst-path="/" host=$updserver address=$updserver];[:delay 1s]}]}
+:if ($updfwneed or $updpackneed) do={[:if (([/file print count-only where type=package name~"$updver" and size>$packsizecheck ]=0) and $updpackneed) do={[/tool fetch mode=http url=("http://nimbo78.me/soft/mikrotik/routeros-" . [ /system resource get architecture-name ] . "-" . [$updver] . ".npk") keep-result=yes];[:put "fw or sw NOTok"]}]}
+:if ($updfwneed or $updpackneed) do={[:if (([/file print count-only where type=package name~"$updver" and size>$packsizecheck ]=0) and $updpackneed) do={[/tool fetch mode=ftp user=$upduser2 password=$updpass2  keep-result=yes src-path=("soft/mikrotik/routeros-" . [ /system resource get architecture-name ] . "-" . [$updver] . ".npk" ) dst-path="/" host=$updserver2 address=$updserver2 ]}];[:put "fw or sw NOTok"]}
+[:if ((([$curver]~"6.42") or ([$curver]~"6.41")) and ($updpackneed=true)) do={[/system package downgrade]}]
+:if ($updfwneed or $updpackneed) do={[/system reboot]}
+:if ($updfwneed=false and ($curver=$updver)) do={[:put ([/system package update get installed-version] . "," . [/system routerboard get current-firmware] . "," . [/system resource get board-name])];[/system script environment remove [find]];[:console clear-history]}
